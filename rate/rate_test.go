@@ -6,6 +6,7 @@ package rate
 
 import (
 	"math"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -163,6 +164,11 @@ func TestSimultaneousRequests(t *testing.T) {
 }
 
 func TestLongRunningQPS(t *testing.T) {
+	if runtime.GOOS == "openbsd" {
+		t.Skip("low resolution time.Sleep invalidates test (golang.org/issue/14183)")
+		return
+	}
+
 	// The test runs for a few seconds executing many requests and then checks
 	// that overall number of requests is reasonable.
 	const (
