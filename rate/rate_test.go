@@ -130,6 +130,13 @@ func TestLimiterJumpBackwards(t *testing.T) {
 	})
 }
 
+func TestInfLimiter(t *testing.T) {
+	run(t, NewLimiter(Inf, 0), []allow{
+		{t0, 1000, true},
+		{t9, 1000, true},
+	})
+}
+
 func TestSimultaneousRequests(t *testing.T) {
 	const (
 		limit       = 1
@@ -249,6 +256,13 @@ func TestSimpleReserve(t *testing.T) {
 	runReserve(t, lim, request{t0, 2, t0, true})
 	runReserve(t, lim, request{t0, 2, t2, true})
 	runReserve(t, lim, request{t3, 2, t4, true})
+}
+
+func TestInfReserve(t *testing.T) {
+	lim := NewLimiter(Inf, 0)
+
+	runReserve(t, lim, request{t0, 1000, t0, true})
+	runReserve(t, lim, request{t9, 1000, t9, true})
 }
 
 func TestMix(t *testing.T) {
@@ -424,4 +438,13 @@ func TestWaitTimeout(t *testing.T) {
 	defer cancel()
 	runWait(t, lim, wait{"act-now", ctx, 2, 0, true})
 	runWait(t, lim, wait{"w-timeout-err", ctx, 3, 0, false})
+}
+
+func TestWaitInf(t *testing.T) {
+	lim := NewLimiter(Inf, 0)
+
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	runWait(t, lim, wait{"act-now", ctx, 1000, 0, true})
+	cancel()
+	runWait(t, lim, wait{"already-cancelled", ctx, 1000, 0, false})
 }
