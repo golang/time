@@ -222,7 +222,7 @@ func (lim *Limiter) Wait(ctx context.Context) (err error) {
 // It returns an error if n exceeds the Limiter's burst size, the Context is
 // canceled, or the expected wait time exceeds the Context's Deadline.
 func (lim *Limiter) WaitN(ctx context.Context, n int) (err error) {
-	if n > lim.burst {
+	if n > lim.burst && lim.limit != Inf {
 		return fmt.Errorf("rate: Wait(n=%d) exceeds limiter's burst %d", n, lim.burst)
 	}
 	// Check if ctx is already cancelled
