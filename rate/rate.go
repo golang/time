@@ -199,8 +199,8 @@ func (lim *Limiter) Reserve() *Reservation {
 // The Limiter takes this Reservation into account when allowing future events.
 // ReserveN returns false if n exceeds the Limiter's burst size.
 // Usage example:
-//   r, ok := lim.ReserveN(time.Now(), 1)
-//   if !ok {
+//   r := lim.ReserveN(time.Now(), 1)
+//   if !r.OK() {
 //     // Not allowed to act! Did you remember to set lim.burst to be > 0 ?
 //   }
 //   time.Sleep(r.Delay())
