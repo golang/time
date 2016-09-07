@@ -396,7 +396,7 @@ func TestWaitSimple(t *testing.T) {
 	cancel()
 	runWait(t, lim, wait{"already-cancelled", ctx, 1, 0, false})
 
-	runWait(t, lim, wait{"n-gt-burst", context.Background(), 4, 0, false})
+	runWait(t, lim, wait{"exceed-burst-error", context.Background(), 4, 0, false})
 
 	runWait(t, lim, wait{"act-now", context.Background(), 2, 0, true})
 	runWait(t, lim, wait{"act-later", context.Background(), 3, 2, true})
@@ -424,6 +424,12 @@ func TestWaitTimeout(t *testing.T) {
 	defer cancel()
 	runWait(t, lim, wait{"act-now", ctx, 2, 0, true})
 	runWait(t, lim, wait{"w-timeout-err", ctx, 3, 0, false})
+}
+
+func TestWaitInf(t *testing.T) {
+	lim := NewLimiter(Inf, 0)
+
+	runWait(t, lim, wait{"exceed-burst-no-error", context.Background(), 3, 0, true})
 }
 
 func BenchmarkAllowN(b *testing.B) {
