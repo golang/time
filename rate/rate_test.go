@@ -425,3 +425,15 @@ func TestWaitTimeout(t *testing.T) {
 	runWait(t, lim, wait{"act-now", ctx, 2, 0, true})
 	runWait(t, lim, wait{"w-timeout-err", ctx, 3, 0, false})
 }
+
+func BenchmarkAllowN(b *testing.B) {
+	lim := NewLimiter(Every(1*time.Second), 1)
+	now := time.Now()
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			lim.AllowN(now, 1)
+		}
+	})
+}

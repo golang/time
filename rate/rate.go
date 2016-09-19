@@ -281,9 +281,9 @@ func (lim *Limiter) SetLimitAt(now time.Time, newLimit Limit) {
 // reserveN returns Reservation, not *Reservation, to avoid allocation in AllowN and WaitN.
 func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duration) Reservation {
 	lim.mu.Lock()
-	defer lim.mu.Unlock()
 
 	if lim.limit == Inf {
+		lim.mu.Unlock()
 		return Reservation{
 			ok:        true,
 			lim:       lim,
@@ -326,6 +326,7 @@ func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duratio
 		lim.last = last
 	}
 
+	lim.mu.Unlock()
 	return r
 }
 
