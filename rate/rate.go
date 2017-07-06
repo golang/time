@@ -273,6 +273,11 @@ func (lim *Limiter) SetLimit(newLimit Limit) {
 	lim.SetLimitAt(time.Now(), newLimit)
 }
 
+// SetBurst sets new burst size for the limiter.
+func (lim *Limiter) SetBurst(burst int) {
+	lim.burst = burst
+}
+
 // SetLimitAt sets a new Limit for the limiter. The new Limit, and Burst, may be violated
 // or underutilized by those which reserved (using Reserve or Wait) but did not yet act
 // before SetLimitAt was called.
