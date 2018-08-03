@@ -457,3 +457,15 @@ func BenchmarkWaitNNoDelay(b *testing.B) {
 		lim.WaitN(ctx, 1)
 	}
 }
+
+func BenchmarkReserveN(b *testing.B) {
+	lim := NewLimiter(Every(1*time.Second), 1)
+	now := time.Now()
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			lim.ReserveN(now, 1)
+		}
+	})
+}
