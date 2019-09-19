@@ -352,6 +352,15 @@ func TestReserveSetLimit(t *testing.T) {
 	runReserve(t, lim, request{t2, 1, t4, true}) // violates Limit and Burst
 }
 
+func TestReserveSetBurst(t *testing.T) {
+	lim := NewLimiter(5, 2)
+
+	runReserve(t, lim, request{t0, 2, t0, true})
+	runReserve(t, lim, request{t0, 2, t4, true})
+	lim.SetBurstAt(t3, 4)
+	runReserve(t, lim, request{t0, 4, t9, true}) // violates Limit and Burst
+}
+
 func TestReserveSetLimitCancel(t *testing.T) {
 	lim := NewLimiter(5, 2)
 
