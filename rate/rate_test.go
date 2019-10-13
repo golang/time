@@ -131,6 +131,15 @@ func TestLimiterJumpBackwards(t *testing.T) {
 	})
 }
 
+// Ensure that tokensFromDuration doesn't produce
+// rounding errors by truncating nanoseconds.
+// See golang.org/issues/34861.
+func TestLimiter_noTruncationErrors(t *testing.T) {
+	if !NewLimiter(0.7692307692307693, 1).Allow() {
+		t.Fatal("expected true")
+	}
+}
+
 func TestSimultaneousRequests(t *testing.T) {
 	const (
 		limit       = 1
