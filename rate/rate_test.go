@@ -445,6 +445,12 @@ func TestWaitInf(t *testing.T) {
 	runWait(t, lim, wait{"exceed-burst-no-error", context.Background(), 3, 0, true})
 }
 
+func TestIssue34861(t *testing.T) {
+	if !NewLimiter(Limit(0.7692307692307693), 1).Allow() {
+		t.Errorf("%v: expect true, got false", t.Name())
+	}
+}
+
 func BenchmarkAllowN(b *testing.B) {
 	lim := NewLimiter(Every(1*time.Second), 1)
 	now := time.Now()
