@@ -447,7 +447,7 @@ func TestWaitInf(t *testing.T) {
 
 func TestIssue34861(t *testing.T) {
 	if !NewLimiter(Limit(0.7692307692307693), 1).Allow() {
-		t.Errorf("%v: expect true, got false", t.Name())
+		t.Error("expect true, got false")
 	}
 }
 
