@@ -386,7 +386,7 @@ func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time,
 // of time it takes to accumulate them at a rate of limit tokens per second.
 func (limit Limit) durationFromTokens(tokens float64) time.Duration {
 	seconds := tokens / float64(limit)
-	return time.Nanosecond * time.Duration(1e9*seconds)
+	return time.Nanosecond * time.Duration(math.Round(1e9*seconds))
 }
 
 // tokensFromDuration is a unit conversion function from a time duration to the number of tokens

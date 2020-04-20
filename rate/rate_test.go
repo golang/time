@@ -97,6 +97,14 @@ func TestLimiterBurst1(t *testing.T) {
 	})
 }
 
+func TestLimiterBurst1Special(t *testing.T) {
+	run(t, NewLimiter(185.1851851851852, 1), []allow{
+		{t0, 1, true},
+		{t3, 1, true},
+		{t9, 1, true},
+	})
+}
+
 func TestLimiterBurst3(t *testing.T) {
 	run(t, NewLimiter(10, 3), []allow{
 		{t0, 2, true},
