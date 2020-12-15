@@ -7,6 +7,7 @@ package rate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -28,6 +29,16 @@ func Every(interval time.Duration) Limit {
 	}
 	return 1 / Limit(interval.Seconds())
 }
+
+var (
+	// ErrExceedsBurst is returned when the limiter's burst is exceeded. The
+	// error is wrapped with additional context.
+	ErrExceedsBurst = errors.New("exceeds limiter's burst")
+
+	// ErrWouldExceedDeadline is returned when the limiter's deadline would be
+	// exceeded. The error is wrapped with additional context.
+	ErrWouldExceedDeadline = errors.New("would exceed context deadline")
+)
 
 // A Limiter controls how frequently events are allowed to happen.
 // It implements a "token bucket" of size b, initially full and refilled
@@ -230,7 +241,7 @@ func (lim *Limiter) WaitN(ctx context.Context, n int) (err error) {
 	lim.mu.Unlock()
 
 	if n > burst && limit != Inf {
-		return fmt.Errorf("rate: Wait(n=%d) exceeds limiter's burst %d", n, burst)
+		return fmt.Errorf("rate: Wait(n=%d) %w %d", n, ErrExceedsBurst, burst)
 	}
 	// Check if ctx is already cancelled
 	select {
@@ -247,7 +258,7 @@ func (lim *Limiter) WaitN(ctx context.Context, n int) (err error) {
 	// Reserve
 	r := lim.reserveN(now, n, waitLimit)
 	if !r.ok {
-		return fmt.Errorf("rate: Wait(n=%d) would exceed context deadline", n)
+		return fmt.Errorf("rate: Wait(n=%d) %w", n, ErrWouldExceedDeadline)
 	}
 	// Wait if necessary
 	delay := r.DelayFrom(now)
