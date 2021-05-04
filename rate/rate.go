@@ -80,6 +80,17 @@ func (lim *Limiter) Burst() int {
 	return lim.burst
 }
 
+// Remaining gets the remaining number of tokens
+func (lim *Limiter) Remaining() int {
+	lim.mu.Lock()
+	defer lim.mu.Unlock()
+	lim.advance(time.Now())
+	if lim.tokens < 0 {
+		return 0
+	}
+	return int(lim.tokens)
+}
+
 // NewLimiter returns a new Limiter that allows events up to rate r and permits
 // bursts of at most b tokens.
 func NewLimiter(r Limit, b int) *Limiter {

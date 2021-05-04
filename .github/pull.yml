@@ -1,0 +1,10 @@
+version: "1"
+rules:
+  - base: master
+    upstream: golang:master
+    mergeMethod: rebase
+    mergeUnstable: false
+    conflictReviewers:      # Optional, on merge conflict assign a reviewer
+      - jakesyl
+label: ":arrow_heading_down: pull"  # Optional
+conflictLabel: "merge-conflict"     # Optional, on merge conflict assign a custom label, Default: merge-conflict

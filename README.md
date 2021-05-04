@@ -1,5 +1,9 @@
 # Go Time
 
+** [Entropy](https://entropy.rocks) fork **. 
+
+This adds a naively implemented Remaining() method for calculating the remaining number of tokens 
+
 [![Go Reference](https://pkg.go.dev/badge/golang.org/x/time.svg)](https://pkg.go.dev/golang.org/x/time)
 
 This repository provides supplementary Go time packages.

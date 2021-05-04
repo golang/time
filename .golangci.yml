@@ -1,0 +1,34 @@
+# see: https://golangci-lint.run/usage/configuration/ for config info
+run:
+  # default concurrency is a available CPU number
+  concurrency: 10
+  # include test files or not, default is true
+  tests: true
+  # lint examples
+  skip-dirs-use-default: false
+  # for slow ci machines
+  timeout: 10m
+
+linters-settings:
+  golint:
+    min-confidence: 0.8
+  gofmt:
+    # simplify code: gofmt with `-s` option, true by default
+    simplify: true
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - unconvert
+    - goimports
+    - golint
+    - misspell
+  disable:
+    - gosimple
+    - errcheck
+  disable-all: false
+  fast: false
+
+issues:
+  exclude-use-default: false

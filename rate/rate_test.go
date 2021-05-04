@@ -425,6 +425,29 @@ func TestWaitSimple(t *testing.T) {
 	runWait(t, lim, wait{"act-later", context.Background(), 3, 2, true})
 }
 
+func TestRemainingSimple(t *testing.T) {
+	const rateLimit = 10
+	rateLimiter := NewLimiter(Every(time.Hour), rateLimit)
+	for i := 0; i < rateLimit+2; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
+		defer cancel()
+		err := rateLimiter.Wait(ctx)
+		if i < rateLimit {
+			if err != nil {
+				t.Error(err)
+			}
+			if rateLimiter.Remaining() != rateLimit-(i+1) {
+				t.Error("rate limit should be equal to burst capacity")
+			}
+		} else {
+			if rateLimiter.Remaining() != 0 {
+				t.Errorf("expected remaining to be 0")
+			}
+		}
+
+	}
+}
+
 func TestWaitCancel(t *testing.T) {
 	lim := NewLimiter(10, 3)
 
