@@ -480,3 +480,13 @@ func BenchmarkWaitNNoDelay(b *testing.B) {
 		lim.WaitN(ctx, 1)
 	}
 }
+
+func TestZeroLimit(t *testing.T) {
+	r := NewLimiter(0, 1)
+	if !r.Allow() {
+		t.Errorf("Limit(0, 1) want true when first used")
+	}
+	if r.Allow() {
+		t.Errorf("Limit(0, 1) want false when already used")
+	}
+}
