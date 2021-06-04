@@ -476,3 +476,11 @@ func BenchmarkWaitNNoDelay(b *testing.B) {
 		lim.WaitN(ctx, 1)
 	}
 }
+
+func TestPreciseAllow(t *testing.T) {
+	lim := NewLimiter(0.00027777777777777778, 1)
+	lim.tokens = 0.54990492004805558
+	if !lim.Allow() {
+		t.Errorf("want ok, got false")
+	}
+}
