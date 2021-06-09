@@ -75,6 +75,7 @@ type allow struct {
 }
 
 func run(t *testing.T, lim *Limiter, allows []allow) {
+	t.Helper()
 	for i, allow := range allows {
 		ok := lim.AllowN(allow.t, allow.n)
 		if ok != allow.ok {
@@ -245,10 +246,12 @@ func dSince(t time.Time) int {
 }
 
 func runReserve(t *testing.T, lim *Limiter, req request) *Reservation {
+	t.Helper()
 	return runReserveMax(t, lim, req, InfDuration)
 }
 
 func runReserveMax(t *testing.T, lim *Limiter, req request, maxReserve time.Duration) *Reservation {
+	t.Helper()
 	r := lim.reserveN(req.t, req.n, maxReserve)
 	if r.ok && (dSince(r.timeToAct) != dSince(req.act)) || r.ok != req.ok {
 		t.Errorf("lim.reserveN(t%d, %v, %v) = (t%d, %v) want (t%d, %v)",
@@ -270,7 +273,7 @@ func TestMix(t *testing.T) {
 
 	runReserve(t, lim, request{t0, 3, t1, false}) // should return false because n > Burst
 	runReserve(t, lim, request{t0, 2, t0, true})
-	run(t, lim, []allow{{t1, 2, false}}) // not enought tokens - don't allow
+	run(t, lim, []allow{{t1, 2, false}}) // not enough tokens - don't allow
 	runReserve(t, lim, request{t1, 2, t2, true})
 	run(t, lim, []allow{{t1, 1, false}}) // negative tokens - don't allow
 	run(t, lim, []allow{{t3, 1, true}})
@@ -399,6 +402,7 @@ type wait struct {
 }
 
 func runWait(t *testing.T, lim *Limiter, w wait) {
+	t.Helper()
 	start := time.Now()
 	err := lim.WaitN(w.ctx, w.n)
 	delay := time.Since(start)
