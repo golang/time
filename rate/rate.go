@@ -367,8 +367,8 @@ func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time,
 	// Avoid making delta overflow below when last is very old.
 	maxElapsed := lim.limit.durationFromTokens(float64(lim.burst) - lim.tokens)
 	elapsed := now.Sub(last)
-	if elapsed > maxElapsed {
-		elapsed = maxElapsed
+	if elapsed >= maxElapsed {
+		return now, last, float64(lim.burst)
 	}
 
 	// Calculate the new number of tokens, due to time that passed.
