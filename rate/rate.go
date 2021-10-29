@@ -340,10 +340,8 @@ func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duratio
 	if ok {
 		r.tokens = n
 		r.timeToAct = now.Add(waitDuration)
-	}
 
-	// Update state
-	if ok {
+		// Update state
 		lim.last = now
 		lim.tokens = tokens
 		lim.lastEvent = r.timeToAct
@@ -367,10 +365,7 @@ func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time,
 	// Calculate the new number of tokens, due to time that passed.
 	elapsed := now.Sub(last)
 	delta := lim.limit.tokensFromDuration(elapsed)
-	tokens := lim.tokens + delta
-	if burst := float64(lim.burst); tokens > burst {
-		tokens = burst
-	}
+	tokens := math.Min(lim.tokens+delta, float64(lim.burst))
 	return now, last, tokens
 }
 
