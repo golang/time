@@ -233,11 +233,12 @@ type request struct {
 	ok  bool
 }
 
-// dFromDuration converts a duration to a multiple of the global constant d
+// dFromDuration converts a duration to the nearest multiple of the global constant d.
 func dFromDuration(dur time.Duration) int {
-	// Adding a millisecond to be swallowed by the integer division
-	// because we don't care about small inaccuracies
-	return int((dur + time.Millisecond) / d)
+	// Add d/2 to dur so that integer division will round to
+	// the nearest multiple instead of truncating.
+	// (We don't care about small inaccuracies.)
+	return int((dur + (d / 2)) / d)
 }
 
 // dSince returns multiples of d since t0
@@ -406,14 +407,43 @@ func runWait(t *testing.T, lim *Limiter, w wait) {
 	start := time.Now()
 	err := lim.WaitN(w.ctx, w.n)
 	delay := time.Since(start)
-	if (w.nilErr && err != nil) || (!w.nilErr && err == nil) || w.delay != dFromDuration(delay) {
+
+	if (w.nilErr && err != nil) || (!w.nilErr && err == nil) || !waitDelayOk(w.delay, delay) {
 		errString := "<nil>"
 		if !w.nilErr {
 			errString = "<non-nil error>"
 		}
-		t.Errorf("lim.WaitN(%v, lim, %v) = %v with delay %v ; want %v with delay %v",
-			w.name, w.n, err, delay, errString, d*time.Duration(w.delay))
+		t.Errorf("lim.WaitN(%v, lim, %v) = %v with delay %v; want %v with delay %v (±%v)",
+			w.name, w.n, err, delay, errString, d*time.Duration(w.delay), d/2)
 	}
+}
+
+// waitDelayOk reports whether a duration spent in WaitN is “close enough” to
+// wantD multiples of d, given scheduling slop.
+func waitDelayOk(wantD int, got time.Duration) bool {
+	gotD := dFromDuration(got)
+
+	// The actual time spent waiting will be REDUCED by the amount of time spent
+	// since the last call to the limiter. We expect the time in between calls to
+	// be executing simple, straight-line, non-blocking code, so it should reduce
+	// the wait time by no more than half a d, which would round to exactly wantD.
+	if gotD < wantD {
+		return false
+	}
+
+	// The actual time spend waiting will be INCREASED by the amount of scheduling
+	// slop in the platform's sleep syscall, plus the amount of time spent executing
+	// straight-line code before measuring the elapsed duration.
+	// (The latter is surely less than half a d.)
+	maxD := wantD
+	switch runtime.GOOS {
+	case "netbsd", "openbsd":
+		// NetBSD and OpenBSD tend to overshoot sleeps by a wide margin due to a
+		// suspected platform bug; see https://go.dev/issue/44067 and
+		// https://go.dev/issue/50189.
+		maxD = (wantD*3 + 1) / 2 // 150% of wantD, rounded up.
+	}
+	return gotD <= maxD
 }
 
 func TestWaitSimple(t *testing.T) {
