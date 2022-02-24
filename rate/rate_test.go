@@ -437,10 +437,14 @@ func waitDelayOk(wantD int, got time.Duration) bool {
 	// (The latter is surely less than half a d.)
 	maxD := wantD
 	switch runtime.GOOS {
-	case "netbsd", "openbsd":
+	case "netbsd", "openbsd", "android", "plan9":
 		// NetBSD and OpenBSD tend to overshoot sleeps by a wide margin due to a
 		// suspected platform bug; see https://go.dev/issue/44067 and
 		// https://go.dev/issue/50189.
+		//
+		// Android and plan9 were empirically observed to overshoot too.
+		// Android might be trying to conserve power.
+		// For plan9, I (bcmills) am not sure what the problem would be.
 		maxD = (wantD*3 + 1) / 2 // 150% of wantD, rounded up.
 	}
 	return gotD <= maxD
