@@ -427,6 +427,12 @@ func TestReserveJumpBack(t *testing.T) {
 	runReserve(t, lim, request{t1, 2, t1, true}) // start at t1
 	runReserve(t, lim, request{t0, 1, t1, true}) // should violate Limit,Burst
 	runReserve(t, lim, request{t2, 2, t3, true})
+	// burst size is 2, so n=3 always fails, and the state of lim should not be changed
+	runReserve(t, lim, request{t0, 3, time.Time{}, false})
+	runReserve(t, lim, request{t2, 1, t4, true})
+	// the maxReserve is not enough so it fails, and the state of lim should not be changed
+	runReserveMax(t, lim, request{t0, 2, time.Time{}, false}, d)
+	runReserve(t, lim, request{t2, 1, t5, true})
 }
 
 func TestReserveJumpBackCancel(t *testing.T) {
