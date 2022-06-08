@@ -10,7 +10,6 @@ package rate
 import (
 	"context"
 	"math"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -142,6 +141,93 @@ func TestLimiter_noTruncationErrors(t *testing.T) {
 	}
 }
 
+// testTime is a fake time used for testing.
+type testTime struct {
+	mu     sync.Mutex
+	cur    time.Time   // current fake time
+	timers []testTimer // fake timers
+}
+
+// testTimer is a fake timer.
+type testTimer struct {
+	when time.Time
+	ch   chan<- time.Time
+}
+
+// now returns the current fake time.
+func (tt *testTime) now() time.Time {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	return tt.cur
+}
+
+// newTimer creates a fake timer. It returns the channel,
+// a function to stop the timer (which we don't care about),
+// and a function to advance to the next timer.
+func (tt *testTime) newTimer(dur time.Duration) (<-chan time.Time, func() bool, func()) {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	ch := make(chan time.Time, 1)
+	timer := testTimer{
+		when: tt.cur.Add(dur),
+		ch:   ch,
+	}
+	tt.timers = append(tt.timers, timer)
+	return ch, func() bool { return true }, tt.advanceToTimer
+}
+
+// since returns the fake time since the given time.
+func (tt *testTime) since(t time.Time) time.Duration {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	return tt.cur.Sub(t)
+}
+
+// advance advances the fake time.
+func (tt *testTime) advance(dur time.Duration) {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	tt.advanceUnlocked(dur)
+}
+
+// advanceUnlock advances the fake time, assuming it is already locked.
+func (tt *testTime) advanceUnlocked(dur time.Duration) {
+	tt.cur = tt.cur.Add(dur)
+	i := 0
+	for i < len(tt.timers) {
+		if tt.timers[i].when.After(tt.cur) {
+			i++
+		} else {
+			tt.timers[i].ch <- tt.cur
+			copy(tt.timers[i:], tt.timers[i+1:])
+			tt.timers = tt.timers[:len(tt.timers)-1]
+		}
+	}
+}
+
+// advanceToTimer advances the time to the next timer.
+func (tt *testTime) advanceToTimer() {
+	tt.mu.Lock()
+	defer tt.mu.Unlock()
+	if len(tt.timers) == 0 {
+		panic("no timer")
+	}
+	when := tt.timers[0].when
+	for _, timer := range tt.timers[1:] {
+		if timer.when.Before(when) {
+			when = timer.when
+		}
+	}
+	tt.advanceUnlocked(when.Sub(tt.cur))
+}
+
+// makeTestTime hooks the testTimer into the package.
+func makeTestTime(t *testing.T) *testTime {
+	return &testTime{
+		cur: time.Now(),
+	}
+}
+
 func TestSimultaneousRequests(t *testing.T) {
 	const (
 		limit       = 1
@@ -176,44 +262,31 @@ func TestSimultaneousRequests(t *testing.T) {
 }
 
 func TestLongRunningQPS(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping in short mode")
-	}
-	if runtime.GOOS == "openbsd" {
-		t.Skip("low resolution time.Sleep invalidates test (golang.org/issue/14183)")
-		return
-	}
-
-	// The test runs for a few seconds executing many requests and then checks
-	// that overall number of requests is reasonable.
+	// The test runs for a few (fake) seconds executing many requests
+	// and then checks that overall number of requests is reasonable.
 	const (
 		limit = 100
 		burst = 100
 	)
-	var numOK = int32(0)
+	var (
+		numOK = int32(0)
+		tt    = makeTestTime(t)
+	)
 
 	lim := NewLimiter(limit, burst)
 
-	var wg sync.WaitGroup
-	f := func() {
-		if ok := lim.Allow(); ok {
-			atomic.AddInt32(&numOK, 1)
-		}
-		wg.Done()
-	}
-
-	start := time.Now()
+	start := tt.now()
 	end := start.Add(5 * time.Second)
-	for time.Now().Before(end) {
-		wg.Add(1)
-		go f()
+	for tt.now().Before(end) {
+		if ok := lim.AllowN(tt.now(), 1); ok {
+			numOK++
+		}
 
 		// This will still offer ~500 requests per second, but won't consume
 		// outrageous amount of CPU.
-		time.Sleep(2 * time.Millisecond)
+		tt.advance(2 * time.Millisecond)
 	}
-	wg.Wait()
-	elapsed := time.Since(start)
+	elapsed := tt.since(start)
 	ideal := burst + (limit * float64(elapsed) / float64(time.Second))
 
 	// We should never get more requests than allowed.
@@ -402,11 +475,11 @@ type wait struct {
 	nilErr bool
 }
 
-func runWait(t *testing.T, lim *Limiter, w wait) {
+func runWait(t *testing.T, tt *testTime, lim *Limiter, w wait) {
 	t.Helper()
-	start := time.Now()
-	err := lim.WaitN(w.ctx, w.n)
-	delay := time.Since(start)
+	start := tt.now()
+	err := lim.wait(w.ctx, w.n, start, tt.newTimer)
+	delay := tt.since(start)
 
 	if (w.nilErr && err != nil) || (!w.nilErr && err == nil) || !waitDelayOk(w.delay, delay) {
 		errString := "<nil>"
@@ -451,46 +524,55 @@ func waitDelayOk(wantD int, got time.Duration) bool {
 }
 
 func TestWaitSimple(t *testing.T) {
+	tt := makeTestTime(t)
+
 	lim := NewLimiter(10, 3)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	runWait(t, lim, wait{"already-cancelled", ctx, 1, 0, false})
+	runWait(t, tt, lim, wait{"already-cancelled", ctx, 1, 0, false})
 
-	runWait(t, lim, wait{"exceed-burst-error", context.Background(), 4, 0, false})
+	runWait(t, tt, lim, wait{"exceed-burst-error", context.Background(), 4, 0, false})
 
-	runWait(t, lim, wait{"act-now", context.Background(), 2, 0, true})
-	runWait(t, lim, wait{"act-later", context.Background(), 3, 2, true})
+	runWait(t, tt, lim, wait{"act-now", context.Background(), 2, 0, true})
+	runWait(t, tt, lim, wait{"act-later", context.Background(), 3, 2, true})
 }
 
 func TestWaitCancel(t *testing.T) {
+	tt := makeTestTime(t)
+
 	lim := NewLimiter(10, 3)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runWait(t, lim, wait{"act-now", ctx, 2, 0, true}) // after this lim.tokens = 1
+	runWait(t, tt, lim, wait{"act-now", ctx, 2, 0, true}) // after this lim.tokens = 1
+	ch, _, _ := tt.newTimer(d)
 	go func() {
-		time.Sleep(d)
+		<-ch
 		cancel()
 	}()
-	runWait(t, lim, wait{"will-cancel", ctx, 3, 1, false})
+	runWait(t, tt, lim, wait{"will-cancel", ctx, 3, 1, false})
 	// should get 3 tokens back, and have lim.tokens = 2
 	t.Logf("tokens:%v last:%v lastEvent:%v", lim.tokens, lim.last, lim.lastEvent)
-	runWait(t, lim, wait{"act-now-after-cancel", context.Background(), 2, 0, true})
+	runWait(t, tt, lim, wait{"act-now-after-cancel", context.Background(), 2, 0, true})
 }
 
 func TestWaitTimeout(t *testing.T) {
+	tt := makeTestTime(t)
+
 	lim := NewLimiter(10, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	runWait(t, lim, wait{"act-now", ctx, 2, 0, true})
-	runWait(t, lim, wait{"w-timeout-err", ctx, 3, 0, false})
+	runWait(t, tt, lim, wait{"act-now", ctx, 2, 0, true})
+	runWait(t, tt, lim, wait{"w-timeout-err", ctx, 3, 0, false})
 }
 
 func TestWaitInf(t *testing.T) {
+	tt := makeTestTime(t)
+
 	lim := NewLimiter(Inf, 0)
 
-	runWait(t, lim, wait{"exceed-burst-no-error", context.Background(), 3, 0, true})
+	runWait(t, tt, lim, wait{"exceed-burst-no-error", context.Background(), 3, 0, true})
 }
 
 func BenchmarkAllowN(b *testing.B) {
