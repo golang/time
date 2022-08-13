@@ -68,14 +68,19 @@ var (
 )
 
 type allow struct {
-	t  time.Time
-	n  int
-	ok bool
+	t    time.Time
+	toks float64
+	n    int
+	ok   bool
 }
 
 func run(t *testing.T, lim *Limiter, allows []allow) {
 	t.Helper()
 	for i, allow := range allows {
+		if toks := lim.TokensAt(allow.t); toks != allow.toks {
+			t.Errorf("step %d: lim.TokensAt(%v) = %v want %v",
+				i, allow.t, toks, allow.toks)
+		}
 		ok := lim.AllowN(allow.t, allow.n)
 		if ok != allow.ok {
 			t.Errorf("step %d: lim.AllowN(%v, %v) = %v want %v",
@@ -86,49 +91,49 @@ func run(t *testing.T, lim *Limiter, allows []allow) {
 
 func TestLimiterBurst1(t *testing.T) {
 	run(t, NewLimiter(10, 1), []allow{
-		{t0, 1, true},
-		{t0, 1, false},
-		{t0, 1, false},
-		{t1, 1, true},
-		{t1, 1, false},
-		{t1, 1, false},
-		{t2, 2, false}, // burst size is 1, so n=2 always fails
-		{t2, 1, true},
-		{t2, 1, false},
+		{t0, 1, 1, true},
+		{t0, 0, 1, false},
+		{t0, 0, 1, false},
+		{t1, 1, 1, true},
+		{t1, 0, 1, false},
+		{t1, 0, 1, false},
+		{t2, 1, 2, false}, // burst size is 1, so n=2 always fails
+		{t2, 1, 1, true},
+		{t2, 0, 1, false},
 	})
 }
 
 func TestLimiterBurst3(t *testing.T) {
 	run(t, NewLimiter(10, 3), []allow{
-		{t0, 2, true},
-		{t0, 2, false},
-		{t0, 1, true},
-		{t0, 1, false},
-		{t1, 4, false},
-		{t2, 1, true},
-		{t3, 1, true},
-		{t4, 1, true},
-		{t4, 1, true},
-		{t4, 1, false},
-		{t4, 1, false},
-		{t9, 3, true},
-		{t9, 0, true},
+		{t0, 3, 2, true},
+		{t0, 1, 2, false},
+		{t0, 1, 1, true},
+		{t0, 0, 1, false},
+		{t1, 1, 4, false},
+		{t2, 2, 1, true},
+		{t3, 2, 1, true},
+		{t4, 2, 1, true},
+		{t4, 1, 1, true},
+		{t4, 0, 1, false},
+		{t4, 0, 1, false},
+		{t9, 3, 3, true},
+		{t9, 0, 0, true},
 	})
 }
 
 func TestLimiterJumpBackwards(t *testing.T) {
 	run(t, NewLimiter(10, 3), []allow{
-		{t1, 1, true}, // start at t1
-		{t0, 1, true}, // jump back to t0, two tokens remain
-		{t0, 1, true},
-		{t0, 1, false},
-		{t0, 1, false},
-		{t1, 1, true}, // got a token
-		{t1, 1, false},
-		{t1, 1, false},
-		{t2, 1, true}, // got another token
-		{t2, 1, false},
-		{t2, 1, false},
+		{t1, 3, 1, true}, // start at t1
+		{t0, 2, 1, true}, // jump back to t0, two tokens remain
+		{t0, 1, 1, true},
+		{t0, 0, 1, false},
+		{t0, 0, 1, false},
+		{t1, 1, 1, true}, // got a token
+		{t1, 0, 1, false},
+		{t1, 0, 1, false},
+		{t2, 1, 1, true}, // got another token
+		{t2, 0, 1, false},
+		{t2, 0, 1, false},
 	})
 }
 
@@ -299,6 +304,7 @@ func TestLongRunningQPS(t *testing.T) {
 	}
 }
 
+// A request provides the arguments to lim.reserveN(t, n) and the expected results (act, ok).
 type request struct {
 	t   time.Time
 	n   int
@@ -324,6 +330,9 @@ func runReserve(t *testing.T, lim *Limiter, req request) *Reservation {
 	return runReserveMax(t, lim, req, InfDuration)
 }
 
+// runReserveMax attempts to reserve req.n tokens at time req.t, limiting the delay until action to
+// maxReserve. It checks whether the response matches req.act and req.ok. If not, it reports a test
+// error including the difference from expected durations in multiples of d (global constant).
 func runReserveMax(t *testing.T, lim *Limiter, req request, maxReserve time.Duration) *Reservation {
 	t.Helper()
 	r := lim.reserveN(req.t, req.n, maxReserve)
@@ -347,10 +356,10 @@ func TestMix(t *testing.T) {
 
 	runReserve(t, lim, request{t0, 3, t1, false}) // should return false because n > Burst
 	runReserve(t, lim, request{t0, 2, t0, true})
-	run(t, lim, []allow{{t1, 2, false}}) // not enough tokens - don't allow
+	run(t, lim, []allow{{t1, 1, 2, false}}) // not enough tokens - don't allow
 	runReserve(t, lim, request{t1, 2, t2, true})
-	run(t, lim, []allow{{t1, 1, false}}) // negative tokens - don't allow
-	run(t, lim, []allow{{t3, 1, true}})
+	run(t, lim, []allow{{t1, -1, 1, false}}) // negative tokens - don't allow
+	run(t, lim, []allow{{t3, 1, 1, true}})
 }
 
 func TestCancelInvalid(t *testing.T) {
