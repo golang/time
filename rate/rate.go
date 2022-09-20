@@ -386,7 +386,7 @@ func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duratio
 func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time, newTokens float64) {
 	last := lim.last
 	if now.Before(last) {
-		last = now
+		return last, last, lim.tokens
 	}
 
 	// Calculate the new number of tokens, due to time that passed.
