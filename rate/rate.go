@@ -66,7 +66,7 @@ type Limiter struct {
 // Limit returns the maximum overall event rate.
 func (lim *Limiter) Limit() Limit {
 	lim.mu.Lock()
-	defer lim.mu.Unlock()
+	lim.mu.Unlock()
 	return lim.limit
 }
 
