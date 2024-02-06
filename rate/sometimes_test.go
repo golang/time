@@ -92,3 +92,18 @@ func TestSometimesNegative(t *testing.T) {
 	s.Do(func() {})
 	s.Do(func() {})
 }
+
+func BenchmarkSometimes(b *testing.B) {
+	b.Run("no-interval", func(b *testing.B) {
+		s := rate.Sometimes{Every: 10}
+		for i := 0; i < b.N; i++ {
+			s.Do(func() {})
+		}
+	})
+	b.Run("with-interval", func(b *testing.B) {
+		s := rate.Sometimes{Interval: time.Second}
+		for i := 0; i < b.N; i++ {
+			s.Do(func() {})
+		}
+	})
+}
