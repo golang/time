@@ -618,3 +618,23 @@ func TestZeroLimit(t *testing.T) {
 		t.Errorf("Limit(0, 1) want false when already used")
 	}
 }
+
+func TestSetAfterZeroLimit(t *testing.T) {
+	lim := NewLimiter(0, 1)
+	// The limiter should start off full, so even though our rate limit is 0, our first request
+	// should be allowed…
+	if !lim.Allow() {
+		t.Errorf("Limit(0, 1) want true when first used")
+	}
+	// …the token bucket is not being replenished though, so the second request should not succeed
+	if lim.Allow() {
+		t.Errorf("Limit(0, 1) want false when already used")
+	}
+
+	lim.SetLimit(10)
+
+	tt := makeTestTime(t)
+
+	// We set the limit to 10/s so expect to get another token in 100ms
+	runWait(t, tt, lim, wait{"wait-after-set-nonzero-after-zero", context.Background(), 1, 1, true})
+}
