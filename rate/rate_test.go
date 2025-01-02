@@ -192,7 +192,7 @@ func (tt *testTime) advance(dur time.Duration) {
 	tt.advanceUnlocked(dur)
 }
 
-// advanceUnlock advances the fake time, assuming it is already locked.
+// advanceUnlocked advances the fake time, assuming it is already locked.
 func (tt *testTime) advanceUnlocked(dur time.Duration) {
 	tt.cur = tt.cur.Add(dur)
 	i := 0
