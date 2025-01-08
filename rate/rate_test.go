@@ -638,3 +638,20 @@ func TestSetAfterZeroLimit(t *testing.T) {
 	// We set the limit to 10/s so expect to get another token in 100ms
 	runWait(t, tt, lim, wait{"wait-after-set-nonzero-after-zero", context.Background(), 1, 1, true})
 }
+
+// TestTinyLimit tests that a limiter does not allow more than burst, when the rate is tiny.
+// Prior to resolution of issue 71154, this test
+// would fail on amd64 due to overflow in durationFromTokens.
+func TestTinyLimit(t *testing.T) {
+	lim := NewLimiter(1e-10, 1)
+
+	// The limiter starts with 1 burst token, so the first request should succeed
+	if !lim.Allow() {
+		t.Errorf("Limit(1e-10, 1) want true when first used")
+	}
+
+	// The limiter should not have replenished the token bucket yet, so the second request should fail
+	if lim.Allow() {
+		t.Errorf("Limit(1e-10, 1) want false when already used")
+	}
+}
