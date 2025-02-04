@@ -380,7 +380,8 @@ func (lim *Limiter) reserveN(t time.Time, n int, maxFutureReserve time.Duration)
 	return r
 }
 
-// advance calculates and returns an updated state for lim resulting from the passage of time.
+// advance calculates and returns an updated number of tokens for lim
+// resulting from the passage of time.
 // lim is not changed.
 // advance requires that lim.mu is held.
 func (lim *Limiter) advance(t time.Time) (newTokens float64) {
