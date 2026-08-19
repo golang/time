@@ -372,7 +372,9 @@ func (lim *Limiter) reserveN(t time.Time, n int, maxFutureReserve time.Duration)
 		r.timeToAct = t.Add(waitDuration)
 
 		// Update state
-		lim.last = t
+		if t.After(lim.last) {
+			lim.last = t
+		}
 		lim.tokens = tokens
 		lim.lastEvent = r.timeToAct
 	}
